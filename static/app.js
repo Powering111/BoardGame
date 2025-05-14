@@ -103,11 +103,21 @@ function getHoverTile(x, y) {
     return new Index(divY,divX);
 }
 
+
+
+
+window.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+});
+
+
+
+
 const game = new Game();
 
 
 
-(function () {
+(async function () {
 
     const canvas = document.getElementById('a');
 
@@ -124,28 +134,10 @@ const game = new Game();
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
-    const program1 = createProgram(gl, shader1);
-    const program2 = createProgram(gl, shader2);
-    const program3 = createProgram(gl, shader3);
+    const program_tile = createProgram(gl, shader_tile);
+    const program_outline = createProgram(gl, shader_outline);
 
-    var vertexArray = gl.createVertexArray();
-    gl.bindVertexArray(vertexArray);
-
-    const object_pos = new Float32Array(2*TILE_SIZE*TILE_SIZE);
-    for(let i=0;i<TILE_SIZE;i++){
-        for(let j=0;j<TILE_SIZE;j++){
-            const center_x = j*0.0625;
-            const center_y = i*0.0625;
-
-            // const offset = i*TILE_SIZE*8 + j*8;
-            object_pos[(i*TILE_SIZE+j)*2] = center_x;
-            object_pos[(i*TILE_SIZE+j)*2+1] = center_y;
-        }
-    }
-
-    const tile_hover = new Float32Array(TILE_SIZE * TILE_SIZE).fill(0);
-
-
+    // Vertex data for rectangle.
     var vertice_pos = new Float32Array([
         -0.5, -0.5,
         -0.5, 0.5,
@@ -162,7 +154,17 @@ const game = new Game();
         0, 0,
         1, 1,
     ]);
+    const object_pos = new Float32Array(2*TILE_SIZE*TILE_SIZE);
+    for(let i=0;i<TILE_SIZE;i++){
+        for(let j=0;j<TILE_SIZE;j++){
+            const center_x = j*0.0625;
+            const center_y = i*0.0625;
 
+            // const offset = i*TILE_SIZE*8 + j*8;
+            object_pos[(i*TILE_SIZE+j)*2] = center_x;
+            object_pos[(i*TILE_SIZE+j)*2+1] = center_y;
+        }
+    }
     
     const vao = gl.createVertexArray();
     
@@ -193,18 +195,26 @@ const game = new Game();
 
     const hoverBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, hoverBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, tile_hover, gl.DYNAMIC_DRAW);
+    gl.bufferData(gl.ARRAY_BUFFER, game.get_tile_hover(), gl.DYNAMIC_DRAW);
 
-    const hover_loc = gl.getAttribLocation(program1, 'a_hover');
+    const hover_loc = gl.getAttribLocation(program_tile, 'a_hover');
     gl.enableVertexAttribArray(hover_loc);
     gl.vertexAttribPointer(hover_loc, 1, gl.FLOAT, false, 0, 0);
     gl.vertexAttribDivisor(hover_loc, 1);
-    
 
-    
-    const mouse_pos_loc2 = gl.getUniformLocation(program2, "mouse_pos");
-    const mouse_pos_loc3 = gl.getUniformLocation(program3, "mouse_pos");
 
+    const stateBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, stateBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, game.get_tile_state(), gl.DYNAMIC_DRAW);
+    const state_loc = gl.getAttribLocation(program_tile, 'a_state');
+    gl.enableVertexAttribArray(state_loc);
+    gl.vertexAttribIPointer(state_loc, 1, gl.INT, false, 0, 0);
+    gl.vertexAttribDivisor(state_loc, 1);
+
+
+    // uniform locations
+    const curr_state_loc = gl.getUniformLocation(program_tile, "curr_state");
+    const mouse_pos_loc = gl.getUniformLocation(program_outline, "mouse_pos");
     let mousepos = {x:0.0, y:0.0};
 
     canvas.addEventListener('mousemove',(e)=>{
@@ -212,18 +222,52 @@ const game = new Game();
         mousepos.x = pos.x;
         mousepos.y = pos.y;
     });
+    canvas.addEventListener('mousedown', (e)=>{
+        e.preventDefault();
 
-    var texture1 = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, texture1);
-    const img = new Image();
-    img.addEventListener('load', function() {
-        // Now that the image has loaded make copy it to the texture.
-        gl.bindTexture(gl.TEXTURE_2D, texture1);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA,gl.UNSIGNED_BYTE, img);
-        gl.generateMipmap(gl.TEXTURE_2D);
+        const pos = getMousePos(canvas, e);
+        mousepos.x = pos.x;
+        mousepos.y = pos.y;
+
+        const index = getHoverTile(pos.x, pos.y);
+        if(e.button==0){
+            game.reveal(index);
+        }
+        else if(e.button==2){
+            game.flag(index);
+        }
     });
-    // img.src = 'res/awesomeface_3d.png';
-    img.src = 'res/iconmonstr-star-3.svg';
+    
+
+
+    console.log("loading textures...")
+    const sources = ['0','1','2','3','4','5','6','7','8','mine','flag','hidden'];
+    const textures = await Promise.all(
+        sources.map((_, index, array) => {
+            return new Promise((resolve, reject)=>{
+                if(!sources[index]) {
+                    return resolve(null);
+                }
+
+                const img = new Image();
+                img.addEventListener('load', () => {
+                    // Now that the image has loaded make copy it to the texture.
+                    const texture = gl.createTexture();
+                    gl.bindTexture(gl.TEXTURE_2D, texture);
+                    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA,gl.UNSIGNED_BYTE, img);
+                    gl.generateMipmap(gl.TEXTURE_2D);
+                    resolve(texture);
+                });
+                img.addEventListener('error', ()=>{
+                    console.log("error loading texture");
+                    resolve(null);
+                });
+                
+                img.src = `res/${sources[index]}.svg`
+            })
+        })
+    );
+    console.log("loading textures... done!");
 
     let lastTime;
     // render
@@ -253,26 +297,32 @@ const game = new Game();
         gl.bindBuffer(gl.ARRAY_BUFFER, hoverBuffer);
         gl.bufferSubData(gl.ARRAY_BUFFER, 0, game.get_tile_hover());
 
-        // background area
-        gl.useProgram(program2);
-        gl.uniform2f(mouse_pos_loc2, mousepos.x, mousepos.y);
-        
-        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        gl.bindBuffer(gl.ARRAY_BUFFER, stateBuffer);
+        gl.bufferSubData(gl.ARRAY_BUFFER, 0, game.get_tile_state());
         
         // tile outline
-        gl.useProgram(program3);
-        gl.uniform2f(mouse_pos_loc3, mousepos.x, mousepos.y);
+        gl.useProgram(program_outline);
+        gl.uniform2f(mouse_pos_loc, mousepos.x, mousepos.y);
 
         gl.bindVertexArray(vao);
         gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, TILE_SIZE*TILE_SIZE);
 
-        // foreground tile
-        gl.useProgram(program1);
-        gl.bindVertexArray(vao);
-        
-        gl.bindTexture(gl.TEXTURE_2D, texture1);
-        gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, TILE_SIZE*TILE_SIZE);
-        
+        // tile foreground
+        gl.useProgram(program_tile);
+        // gl.bindVertexArray(vao);
+
+        for(let i=0;i<=State.HIDDEN;i++){
+            gl.uniform1i(curr_state_loc, i);
+
+            if(textures[i]){
+                gl.bindTexture(gl.TEXTURE_2D, textures[i]);
+            }
+            else{
+                gl.bindTexture(gl.TEXTURE_2D, textures[0]);
+            }
+            
+            gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, TILE_SIZE*TILE_SIZE);
+        }
 
         requestAnimationFrame(render);
     }
