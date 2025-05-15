@@ -7,24 +7,6 @@ window.addEventListener('contextmenu', (e) => {
 
 
 (async function () {
-    const ws = new WebSocket(`ws://${location.host}`);
-    let matching = false;
-
-    ws.addEventListener('open', (event) => {
-        console.log("connected ", event);
-    });
-    ws.addEventListener('message', (event) => {
-        const data = JSON.parse(event.data);
-        if(data.type=='match_start'){
-            if(!matching){
-                matching = true;
-
-                const game = new Game(ws, images, data.board);
-                game.start();
-            }
-        }
-    });
-
     console.log("loading textures...")
     const sources = ['0','1','2','3','4','5','6','7','8','mine','flag','hidden'];
     const images = await Promise.all(
@@ -51,9 +33,26 @@ window.addEventListener('contextmenu', (e) => {
     console.log(images);
     console.log("loading textures... done!");
 
+    const ws = new WebSocket(`ws://${location.host}`);
+    let matching = false;
 
-    // join
-    ws.send(JSON.stringify({
-        type: 'join'
-    }));
+    ws.addEventListener('open', (event) => {
+        console.log("connected ", event);
+        // join
+        ws.send(JSON.stringify({
+            type: 'join'
+        }));
+    });
+
+    ws.addEventListener('message', (event) => {
+        const data = JSON.parse(event.data);
+        if(data.type=='match_start'){
+            if(!matching){
+                matching = true;
+
+                const game = new Game(ws, images, data.board);
+                game.start();
+            }
+        }
+    });
 })();    
