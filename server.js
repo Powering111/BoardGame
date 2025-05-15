@@ -125,7 +125,7 @@ wss.on('connection', (ws, req) => {
                     // match with existing waiter
                     /** @type {WebSocket} */
                     const opponent = waiter.pop();
-                    const game = new Game.Game(ws, opponent);
+                    const game = new Game.Game(ws, opponent, 2);
                     start_match(ws, opponent, game);
                 }
                 else{

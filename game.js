@@ -127,13 +127,51 @@ class Board {
                 }
             }
         }
-        sample(can_place_idx.length, INITIAL_MINES).forEach(
+        sample(can_place_idx.length, this.mines_left).forEach(
             (idx) => {
                 const index = Index.unserialize(can_place_idx[idx]);
                 this.tiles[index.r][index.c].mine = true;
             }
         );
         this.mine_selected = true;
+    }
+
+    // add mine to hidden, possible place and update adjacent tiles.
+    // if it is not possible to add mine, then do nothing.
+    add_mine(){
+        if(!this.mine_selected){
+            this.mines_left ++;
+            return;
+        }
+
+        const can_place_idx = [];
+        for(let i=0;i<TILE_SIZE;i++){
+            for(let j=0;j<TILE_SIZE;j++){
+                const index = new Index(i,j);
+                if(!this.tiles[i][j].mine && this.tiles[i][j].state == State.HIDDEN){
+                    can_place_idx.push(index.serialize());
+                }
+            }
+        }
+
+        if(can_place_idx.length == 0) return;
+        const index = Index.unserialize(can_place_idx[randInt(can_place_idx.length)]);
+
+        console.log("placing",index);
+        this.tiles[index.r][index.c].mine = true;
+
+        VELOCITY.forEach((vel) => {
+            const next_index = new Index(index.r+vel[0], index.c+vel[1]);
+            if(next_index.is_valid()){
+                const next = this.tiles[next_index.r][next_index.c];
+                if(!next.mine && next.state!=State.HIDDEN){
+                    const reveal_cnt = this.adjacent_mines(next_index);
+                    next.state = reveal_cnt;
+                }
+            }
+        });
+
+        this.mines_left ++;
     }
 
     reveal(index){
@@ -157,7 +195,7 @@ class Board {
     flag(index){
         if(!this.mine_selected){
             // you cannot flag before revealing at least one
-            return;
+            return false;
         }
         const curr = this.tiles[index.r][index.c];
         if(this.over || curr.state!=State.HIDDEN) return;
@@ -169,12 +207,14 @@ class Board {
                 // win
                 this.win = true;
             }
+            return true;
         }
         else{
             const reveal_cnt = this.adjacent_mines(index);
             this.tiles[index.r][index.c].state = reveal_cnt;
             this.over = true;
             this.over_cause = index;
+            return false;
         }
     }
 
@@ -198,13 +238,18 @@ class Game {
     /**
      * @param {WebSocket} ws1
      * @param {WebSocket} ws2
+     * @param {int} deal_factor If nonzero, how many flags do you need to attack once. If zero, there is no attack.
      *  */
-    constructor(ws1, ws2){
+    constructor(ws1, ws2, deal_factor = 0){
         this.ws1 = ws1;
         this.ws2 = ws2;
         
         this.board1 = new Board();
         this.board2 = new Board();
+
+        this.deal_factor = deal_factor;
+        this.deal1 = 0;
+        this.deal2 = 0;
     }
 
     check(){
@@ -244,10 +289,24 @@ class Game {
     flag(board, index){
         if(this.over || !index.is_valid()) return;
         if(board==1){
-            this.board1.flag(index);
+            const res =this.board1.flag(index);
+            if(res){
+                this.deal1++;
+                if(this.deal_factor!=0 && this.deal1>=this.deal_factor){
+                    this.board2.add_mine();
+                    this.deal1=0;
+                }
+            }
         }
         else if(board==2){
-            this.board2.flag(index);
+            const res = this.board2.flag(index);
+            if(res){
+                this.deal2++;
+                if(this.deal_factor!=0 && this.deal2>=this.deal_factor){
+                    this.board1.add_mine();
+                    this.deal2=0;
+                }
+            }
         }
         this.check();
     }
