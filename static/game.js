@@ -79,8 +79,8 @@ function createProgram(gl, shader){
  */
 function getMousePos(canvas, evt) {
     const rect = canvas.getBoundingClientRect(), // abs. size of element
-        scaleX = canvas.width / rect.width / rect.width,    // relationship bitmap vs. element for x
-        scaleY = canvas.height / rect.height / rect.height;  // relationship bitmap vs. element for y
+        scaleX = 1.0 / rect.width,
+        scaleY = 1.0 / rect.height;
     const x = (evt.clientX - rect.left) * scaleX;   // scale mouse coordinates after they have
     const y = (evt.clientY - rect.top) * scaleY;     // been adjusted to be relative to element
 
@@ -393,30 +393,30 @@ class Board{
     }
 }
 
+// Should be singleton
 class Game{
     /**
      * @param {WebSocket} ws
+     * @param {HTMLImageElement[]} images
+     * @param {number} board virtual board number of current player
      */
     constructor(ws, images, board){
         this.ws = ws;
-        this.over = false;
-
-        // virtual board number
-        this.board = board; 
-
         /** @type {Tile[][]} */
+        this.board = board;
+        this.images = images;
+
         const canvas1 = document.getElementById('canvas1');
         const canvas2 = document.getElementById('canvas2');
         /** @type {WebGL2RenderingContext} */
-        const gl1 = canvas1.getContext('webgl2', { antialias: false, depth: false, premultipliedAlpha: false});
-        const gl2 = canvas2.getContext('webgl2', { antialias: false, depth: false, premultipliedAlpha: false});
-        const isWebGL2 = !!gl1;
+        this.gl1 = canvas1.getContext('webgl2', { antialias: false, depth: false, premultipliedAlpha: false});
+        this.gl2 = canvas2.getContext('webgl2', { antialias: false, depth: false, premultipliedAlpha: false});
+        const isWebGL2 = !!this.gl1;
         if(!isWebGL2) {
             document.writeln('WebGL 2 is not available.');
         }
 
-        this.board1 = new Board(gl1, images, true);
-        this.board2 = new Board(gl2, images, false);
+        this.reset();
 
         canvas1.addEventListener('mousedown', (e)=>{
             e.preventDefault();
@@ -431,34 +431,38 @@ class Game{
                 this.flag(index);
             }
         });
+    }
 
-        this.ws.addEventListener('message', (event) => {
-            let data = JSON.parse(event.data);
-            if(data.type == 'update_board'){
-                for (let i = 0; i < TILE_SIZE; i++){
-                    for (let j = 0; j < TILE_SIZE; j++){
-                        this.board1.tiles[i][j].state = parseInt(data.board1.state[i*TILE_SIZE+j], 16);
-                        this.board2.tiles[i][j].state = parseInt(data.board2.state[i*TILE_SIZE+j], 16);
-                    }
-                }
-                this.board1.over_cause = data.board1.over_cause;
-                this.board2.over_cause = data.board2.over_cause;
-                this.board1.last_action = data.board1.last_action;
-                this.board2.last_action = data.board2.last_action;
+    reset(){
+        this.over = false;
+        this.board1 = new Board(this.gl1, this.images, true);
+        this.board2 = new Board(this.gl2, this.images, false);
+    }
 
-                document.getElementById('mines_1').innerText = data.board1.mines_left;
-                document.getElementById('mines_2').innerText = data.board2.mines_left;
+    update_board(board1, board2){
+        for (let i = 0; i < TILE_SIZE; i++){
+            for (let j = 0; j < TILE_SIZE; j++){
+                this.board1.tiles[i][j].state = parseInt(board1.state[i*TILE_SIZE+j], 16);
+                this.board2.tiles[i][j].state = parseInt(board2.state[i*TILE_SIZE+j], 16);
             }
-            else if(data.type == 'match_over'){
-                this.over = true;
-                if(data.winner == this.board){
-                    alert("You win!");
-                }
-                else{
-                    alert("You lose!");
-                }
-            }
-        });
+        }
+        this.board1.over_cause = board1.over_cause;
+        this.board2.over_cause = board2.over_cause;
+        this.board1.last_action = board1.last_action;
+        this.board2.last_action = board2.last_action;
+
+        document.getElementById('mines_1').innerText = board1.mines_left;
+        document.getElementById('mines_2').innerText = board2.mines_left;
+    }
+
+    finish(winner){
+        this.over = true;
+        if(winner == this.board){
+            alert("You win!");
+        }
+        else{
+            alert("You lose!");
+        }
     }
     
     render(now){

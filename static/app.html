@@ -2,18 +2,29 @@
 <html>
     <head>
         <title>WEBGL!!!</title>
+        <link rel="stylesheet" href="app.css">
     </head>
     <body>
-        <div style="display:flex;flex-direction:row;justify-content: space-around;">
-            <div>
-                <canvas id="canvas1" width="800px" height="800px"></canvas>
-                <hr>
-                Mines left: <span id="mines_1"></span>
+        <div id="lobby">
+            <button id="start_btn" class="btn">Start</button>
+        </div>
+        <div id="game" style="display:none;">
+            <div id="game_header">
+                Minesweeper
+                <button id="leave_btn" class="btn">Leave</button>
+
             </div>
-            <div>
-                <canvas id="canvas2" width="800px" height="800px"></canvas>
-                <hr>
-                Mines left: <span id="mines_2"></span>
+            <div class="board_container">
+                <div class="board">
+                    <canvas id="canvas1" width="800px" height="800px"></canvas>
+                    <hr>
+                    Mines left: <span id="mines_1"></span>
+                </div>
+                <div class="board">
+                    <canvas id="canvas2" width="800px" height="800px"></canvas>
+                    <hr>
+                    Mines left: <span id="mines_2"></span>
+                </div>
             </div>
         </div>
         <script src="game.js"></script>

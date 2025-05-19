@@ -1,0 +1,97 @@
+
+
+body, html{
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+}
+
+#lobby{
+    display:flex;
+    justify-content: center;
+    align-items: center;
+    height:100%;
+    width:100%;
+}
+
+#start_btn{
+    position: relative;
+    background: transparent;
+    padding: 20px 40px;
+    border: 4px solid rgb(0, 0, 0);
+    font-size: 2em;
+}
+
+.btn{
+    background: transparent;
+    padding: 10px 20px;
+    outline: none;
+    user-select: none;
+    
+    transition: scale 0.3s;
+}
+
+.btn:hover{
+    cursor:pointer;
+    scale: 1.1;
+}
+
+#start_btn::before{
+    top:0;
+    left:0;
+    z-index: -1;
+    position:absolute;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, rgb(160, 231, 255) 4%, rgb(45, 143, 255) 80%);
+    mask-image: linear-gradient(-45deg, transparent 50%, black 50%);
+    mask-size: 300% 300%;
+    content: "";
+    mask-position: 100% 100%;
+    transition: mask-position 0.3s;
+}
+
+#start_btn:hover::before{
+    mask-position: 0% 0%;
+}
+
+#game{
+    display:flex;
+    flex-direction:column;
+    
+    width:100%;
+    height:100%;
+}
+
+#game_header{
+    padding: 10px;
+    font-size: 1.4em;
+}
+
+.board_container {
+    background: #efefff;
+
+    flex-grow:1;
+
+    display:flex;
+    flex-wrap: wrap;
+    flex-direction:row;
+    justify-content: space-around;
+    align-items: center;
+}
+
+.board{
+    flex-shrink: 1;
+    flex-basis: 400px;
+
+    padding: 3px;
+    max-width:800px;
+
+    flex-grow: 1;
+}
+
+.board canvas{
+    width: 100%;
+    aspect-ratio: 1;
+}
